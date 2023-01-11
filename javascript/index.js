@@ -1,7 +1,10 @@
 const canvas = document.querySelector('canvas')
+const scoreEl = document.querySelector('#scoreEl')
 const c = canvas.getContext('2d')
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
+const arrEn = ["../images/Ace.png", "../images/Katakuri.png"]
+const colors = ["red", "green", "blue"]
 
 class Player {
     constructor() {
@@ -11,8 +14,9 @@ class Player {
             y: 0
         }
         this.roation = 0
+        this.opacity = 1
         const image = new Image()
-        image.src = "../images/luffy.png"
+        image.src = "../images/Ace.png"
         image.onload = () => {
             const scale = 0.15
             this.image = image
@@ -25,9 +29,9 @@ class Player {
         }
     }
 
-
     draw() {
         c.save()
+        c.globalAlpha = this.opacity
         if (this.position) {
             c.translate(player.position.x + player.width / 2, player.position.y + player.height / 2)
             c.rotate(this.roation)
@@ -54,15 +58,16 @@ class Player {
     }
 }
 class Projectile {
-    constructor({ position, velocity }) {
+    constructor({ position, velocity }, color) {
         this.position = position
         this.velocity = velocity
         this.radius = 5
+        this.color = color
     }
     draw() {
         c.beginPath()
         c.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2)
-        c.fillStyle = 'red'
+        c.fillStyle = this.color
         c.fill()
         c.closePath()
     }
@@ -74,12 +79,13 @@ class Projectile {
     }
 }
 class Praticle {
-    constructor({ position, velocity, radius, color }) {
+    constructor({ position, velocity, radius, color, fades }) {
         this.position = position
         this.velocity = velocity
         this.radius = radius
         this.color = color
         this.opacity = 1
+        this.fades = fades
     }
     draw() {
         c.save()
@@ -95,8 +101,8 @@ class Praticle {
         this.draw()
         this.position.x += this.velocity.x
         this.position.y += this.velocity.y
-        this.opacity -= 0.01
-        console.log(this.opacity);
+        if (this.fades)
+            this.opacity -= 0.01
     }
 }
 class InvaderProjectile {
@@ -118,8 +124,9 @@ class InvaderProjectile {
     }
 }
 
+
 class Invader {
-    constructor({ position }) {
+    constructor({ position }, invaderSprite) {
 
         this.velocity = {
             x: 0,
@@ -127,7 +134,7 @@ class Invader {
         }
         this.roation = 0
         const image = new Image()
-        image.src = "../images/Katakuri.png"
+        image.src = invaderSprite
         image.onload = () => {
             const scale = 0.15
             this.image = image
@@ -198,7 +205,9 @@ class Grid {
                             x: i * 40,
                             y: j * 50
                         }
-                    }))
+                    },
+                    arrEn[Math.floor(Math.random() * 2)]
+                ))
             }
         }
     }
@@ -235,18 +244,62 @@ const keys = {
 // player.draw()
 let frames = 0
 let randominterval = Math.floor(Math.random() * 500 + 500)
+let game = {
+    over: false,
+    active: true
+}
+let score = 0
+for (let i = 0; i < 100; i++) {
+    praticles.push(new Praticle({
+        position: {
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height
+        },
+        velocity: {
+            x: 0,
+            y: 0.6
+        },
+        radius: Math.random() * 2,
+        color: 'white'
+    }))
+}
+function createParticles({ object, color, fades }) {
+    for (let i = 0; i < 15; i++) {
+        praticles.push(new Praticle({
+            position: {
+                x: object.position.x + object.width / 2,
+                y: object.position.y + object.height / 2
+            },
+            velocity: {
+                x: (Math.random() - 0.5) * 2,
+                y: (Math.random() - 0.5) * 2
+            },
+            radius: Math.random() * 3,
+            color: color || '#FF3371',
+            fades
+        }))
+    }
+}
 function animate() {
+    if (!game.active) {
+        return
+    }
     requestAnimationFrame(animate)
     c.fillStyle = 'black'
     c.fillRect(0, 0, canvas.width, canvas.height)
     // invader.update()
     player.update()
     praticles.forEach((particle, i) => {
-        if(particle.opacity <= 0){
+        if (particle.position.y - particle.radius >= canvas.height) {
+            particle.position.x = Math.random() * canvas.width
+            particle.position.y = -particle.radius
+
+        }
+        if (particle.opacity <= 0) {
             setTimeout(() => {
                 particle.splice(i, 1)
             }, 0)
-        }else{
+        } else {
             particle.update()
         }
     })
@@ -258,22 +311,50 @@ function animate() {
         } else invaderProjectile.update()
         if (invaderProjectile.position.y + invaderProjectile.height >= player.position.y
             && invaderProjectile.position.x + invaderProjectile.width >= player.position.x
-            && invaderProjectile.position.x <= player.position.x + player.width)
+            && invaderProjectile.position.x <= player.position.x + player.width) {
             console.log('you lose');
+            setTimeout(() => {
+                invaderProjectiles.splice(index, 1)
+                player.opacity = 0
+                game.over = true
+            }, 0)
+            setTimeout(() => {
+                invaderProjectiles.splice(index, 1)
+                game.active = false
+
+            }, 2000)
+            createParticles({
+                object: player,
+                color: 'red',
+                fades: true
+            })
+        }
     })
     projectiles.forEach((projectile, index) => {
         if (projectile.position.y + projectile.radius <= 0) {
-            setTimeout(() => {
-                projectiles.splice(index, 1)
-            }, 0)
+            // setTimeout(() => {
+            projectiles.splice(index, 1)
+            // }, 0)
         }
         else {
             projectile.update()
         }
     })
+
+    // projectiles.forEach(projectile => {
+    //     if (projectile.position.y <= 0) {
+    //         projectiles.splice()
+    //     }
+    // })
+
+    grids.forEach((grid, index) => {
+        if (grid.invaders == 0) {
+            grids.splice(index, 1)
+        }
+    })
+
     grids.forEach((grid, gridIndex) => {
         grid.update()
-        console.log(grid.invaders.length);
         //spawn projctiles 
         if (frames % 100 === 0 && grid.invaders.length > 0) {
             grid.invaders[Math.floor(Math.random() * grid.invaders.length)].shoot(invaderProjectiles)
@@ -292,23 +373,12 @@ function animate() {
                         const projectileFound = projectiles.find(projectile2 => projectile2 === projectile)
                         //remove invader and projectile
                         if (invaderFound && projectileFound) {
-                            for (let i = 0; i < 15; i++) {
-                                praticles.push(new Praticle({
-                                    position: {
-                                        x: invader.position.x + invader.width / 2,
-                                        y: invader.position.y + invader.height / 2
-                                    },
-                                    velocity: {
-                                        x: (Math.random() - 0.5) * 2,
-                                        y: (Math.random() - 0.5) * 2
-                                    },
-                                    radius: Math.random() * 3,
-                                    color: '#FF3371'
-                                }))
-                            }
-
-
-
+                            score += 100
+                            scoreEl.innerHTML = score
+                            createParticles({
+                                object: invader,
+                                fades: true
+                            })
                             grid.invaders.splice(i, 1)
                             projectiles.splice(j, 1)
                             if (grid.invaders.length > 0) {
@@ -340,7 +410,6 @@ function animate() {
         player.roation = 0
 
     }
-    console.log(frames);
     //spawn enemies
     if (frames % randominterval === 0) {
         grids.push(new Grid())
@@ -378,9 +447,20 @@ addEventListener('keydown', ({ key }) => {
                         x: 0,
                         y: -10
                     }
-                })
+                }
+                    , colors[Math.floor(Math.random() * 3)]
+                )
             )
             // console.log(projectiles)
+            break
+        case 'p':
+            game.over = !game.over
+            game.active = !game.active
+            console.log('p');
+            if(game.active){
+                animate()
+            }
+
             break
     }
 })
@@ -397,5 +477,6 @@ addEventListener('keyup', ({ key }) => {
         case ' ':
             // console.log('space');
             break
+
     }
 })
